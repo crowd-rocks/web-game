@@ -15,6 +15,11 @@ export class Game {
     private scene: Scene;
     private camera!: UniversalCamera;
 
+    private isAscending = false;
+    private isDescending = false;
+    private keydownHandler?: (e: KeyboardEvent) => void;
+    private keyupHandler?: (e: KeyboardEvent) => void;
+
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
         this.engine = new Engine(this.canvas, true);
@@ -52,6 +57,49 @@ export class Game {
         const groundMaterial = new StandardMaterial('groundMaterial', this.scene);
         groundMaterial.diffuseColor = new Color3(0.25, 0.3, 0.25);
         ground.material = groundMaterial;
+
+        // Vertical movement (Space to ascend, Shift to descend)
+        this.attachInputListeners();
+        this.scene.registerBeforeRender(() => {
+            const dt = this.engine.getDeltaTime() / 1000; // seconds
+            const verticalSpeedUnitsPerSec = 6 * this.camera.speed; // scale relative to camera speed
+            if (this.isAscending) {
+                this.camera.position.y += verticalSpeedUnitsPerSec * dt;
+            }
+            if (this.isDescending) {
+                this.camera.position.y -= verticalSpeedUnitsPerSec * dt;
+            }
+        });
+    }
+
+    private attachInputListeners(): void {
+        this.keydownHandler = (e: KeyboardEvent) => {
+            if (e.code === 'Space') {
+                this.isAscending = true;
+                e.preventDefault();
+            } else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+                this.isDescending = true;
+                e.preventDefault();
+            }
+        };
+        this.keyupHandler = (e: KeyboardEvent) => {
+            if (e.code === 'Space') {
+                this.isAscending = false;
+                e.preventDefault();
+            } else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+                this.isDescending = false;
+                e.preventDefault();
+            }
+        };
+        window.addEventListener('keydown', this.keydownHandler, { passive: false });
+        window.addEventListener('keyup', this.keyupHandler, { passive: false });
+    }
+
+    private detachInputListeners(): void {
+        if (this.keydownHandler) window.removeEventListener('keydown', this.keydownHandler);
+        if (this.keyupHandler) window.removeEventListener('keyup', this.keyupHandler);
+        this.keydownHandler = undefined;
+        this.keyupHandler = undefined;
     }
 
     public getScene(): Scene {
@@ -69,6 +117,7 @@ export class Game {
     }
 
     public dispose(): void {
+        this.detachInputListeners();
         this.scene.dispose();
         this.engine.dispose();
     }
