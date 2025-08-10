@@ -250,6 +250,8 @@ async function loadInitialChunksAndVoxels(token: string): Promise<void> {
       toggleMenuWithPointerUnlock();
     }
   });
+
+  printKeyBindings();
 }
 
 async function renderAllChunks(mapId: string, chunks: ChunkSummary[], updatesByChunkKey: Map<string, any>): Promise<number> {
@@ -309,6 +311,21 @@ async function onAuthSuccess(tokens: AuthTokens, overlay: HTMLDivElement): Promi
     // eslint-disable-next-line no-console
     console.error('Failed to load chunks/voxels:', err);
   }
+}
+
+function printKeyBindings(): void {
+  // eslint-disable-next-line no-console
+  console.log('Key Bindings');
+  // eslint-disable-next-line no-console
+  console.table([
+    { Action: 'Move', Keys: 'W / A / S / D' },
+    { Action: 'Ascend / Descend', Keys: 'Space / Shift' },
+    { Action: 'Toggle grid', Keys: 'G' },
+    { Action: 'Toggle labels', Keys: 'L' },
+    { Action: 'Open/Close menu', Keys: 'Esc' },
+    { Action: 'Toggle menu (exits pointer lock)', Keys: 'M' },
+    { Action: 'Logout', Keys: 'Menu → Log out' },
+  ]);
 }
 
 // Initialize when page loads
