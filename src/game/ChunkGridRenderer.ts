@@ -25,19 +25,18 @@ export class ChunkGridRenderer {
   }
 
   renderForChunks(coords: ChunkCoord[]): void {
-    const desiredKeys = new Set<string>();
-    for (const c of coords) {
-      const cx = toInt(c.x);
-      const cy = toInt(c.y);
-      const cz = toInt(c.z);
-      const key = `${cx}:${cy}:${cz}`;
-      desiredKeys.add(key);
+    this.renderForChunkKeys(coords.map(c => `${toInt(c.x)}:${toInt(c.y)}:${toInt(c.z)}`));
+  }
+
+  renderForChunkKeys(keys: string[]): void {
+    const desiredKeys = new Set<string>(keys);
+    for (const key of desiredKeys) {
       if (!this.grids.has(key)) {
+        const [cx, cy, cz] = key.split(':').map(v => parseInt(v, 10));
         const mesh = this.createChunkBox(cx, cy, cz);
         this.grids.set(key, mesh);
       }
     }
-    // Remove any grids not in the new set
     for (const [key, mesh] of this.grids) {
       if (!desiredKeys.has(key)) {
         mesh.dispose();

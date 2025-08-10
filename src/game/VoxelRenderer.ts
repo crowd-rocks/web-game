@@ -7,6 +7,7 @@ export class VoxelRenderer {
   private baseCube: Mesh;
   private materialCache: Map<number, StandardMaterial> = new Map();
   private instances: InstancedMesh[] = [];
+  public lastRenderedVoxelCount = 0;
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -20,6 +21,7 @@ export class VoxelRenderer {
     this.baseCube.dispose();
     this.materialCache.forEach(mat => mat.dispose());
     this.materialCache.clear();
+    this.lastRenderedVoxelCount = 0;
   }
 
   private materialForType(voxelType: number): StandardMaterial {
@@ -36,7 +38,7 @@ export class VoxelRenderer {
     return mat;
   }
 
-  renderVoxels(voxels: SimpleVoxel[]): void {
+  renderVoxels(voxels: SimpleVoxel[]): number {
     // Clear previous
     this.instances.forEach(i => i.dispose());
     this.instances = [];
@@ -47,9 +49,11 @@ export class VoxelRenderer {
       inst.material = this.materialForType(v.type);
       this.instances.push(inst);
     }
+    this.lastRenderedVoxelCount = this.instances.length;
+    return this.lastRenderedVoxelCount;
   }
 
-  renderChunkBytes(chunkBytes: Uint8Array, chunkOrigin: { x: number; y: number; z: number }): void {
+  renderChunkBytes(chunkBytes: Uint8Array, chunkOrigin: { x: number; y: number; z: number }): number {
     // Clear previous
     this.instances.forEach(i => i.dispose());
     this.instances = [];
@@ -71,5 +75,7 @@ export class VoxelRenderer {
         }
       }
     }
+    this.lastRenderedVoxelCount = this.instances.length;
+    return this.lastRenderedVoxelCount;
   }
 } 

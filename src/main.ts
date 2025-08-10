@@ -3,10 +3,12 @@ import { Game } from './game/Game';
 import { login as apiLogin, register as apiRegister, getChunksByDistance, listVoxelUpdatesByDistance, decodeChunkVoxelsBase64, applyVoxelUpdatesToChunkBytes, type AuthTokens, type ChunkSummary } from './api/graphql';
 import { VoxelRenderer } from './game/VoxelRenderer';
 import { ChunkGridRenderer } from './game/ChunkGridRenderer';
+import { ChunkLabelRenderer } from './game/ChunkLabelRenderer';
 
 let gameInstance: Game | null = null;
 let voxelRenderer: VoxelRenderer | null = null;
 let gridRenderer: ChunkGridRenderer | null = null;
+let labelRenderer: ChunkLabelRenderer | null = null;
 
 // Initialize the game after authentication
 function bootGame(): Game {
@@ -86,10 +88,27 @@ function pickMapId(): string {
   return '1';
 }
 
+function computeChunkKeysWithinDistance(center: { x: number; y: number; z: number }, distance: number): string[] {
+  const keys: string[] = [];
+  for (let x = center.x - distance; x <= center.x + distance; x++) {
+    for (let y = center.y - distance; y <= center.y + distance; y++) {
+      for (let z = center.z - distance; z <= center.z + distance; z++) {
+        const manhattan = Math.abs(x - center.x) + Math.abs(y - center.y) + Math.abs(z - center.z);
+        if (manhattan <= distance) {
+          keys.push(`${x}:${y}:${z}`);
+        }
+      }
+    }
+  }
+  return keys;
+}
+
 async function loadInitialChunksAndVoxels(token: string): Promise<void> {
   const mapId = pickMapId();
   const centerCoordinate = { x: 0, y: 0, z: 0 };
   const distance = 8;
+
+  const requestedKeys = computeChunkKeysWithinDistance(centerCoordinate, distance);
 
   const chunks = await getChunksByDistance({
     mapId,
@@ -97,12 +116,18 @@ async function loadInitialChunksAndVoxels(token: string): Promise<void> {
     maxDistance: distance,
   }, token);
 
-  // Draw grid for all fetched chunks
+  // Draw grid for all requested chunk coordinates, even if not returned
   if (gameInstance) {
     if (!gridRenderer) {
       gridRenderer = new ChunkGridRenderer(gameInstance.getScene());
     }
-    gridRenderer.renderForChunks(chunks.map(c => c.coordinates));
+    gridRenderer.renderForChunkKeys(requestedKeys);
+
+    if (!labelRenderer) {
+      labelRenderer = new ChunkLabelRenderer(gameInstance.getScene());
+    }
+    // Labels only for chunks we actually got back
+    labelRenderer.renderForChunks(chunks.map(c => c.coordinates));
   }
 
   const updates = await listVoxelUpdatesByDistance({
@@ -119,15 +144,18 @@ async function loadInitialChunksAndVoxels(token: string): Promise<void> {
   }
 
   // For now, render only the origin chunk; we can expand to all chunks after validating
-  renderOriginChunk(chunks, updatesByChunkKey);
+  const voxelsRendered = renderOriginChunk(chunks, updatesByChunkKey);
+
+  // eslint-disable-next-line no-console
+  console.log(`[World Load] requestedChunks=${requestedKeys.length} returnedChunks=${chunks.length} visibleVoxels=${voxelsRendered}`);
 }
 
-function renderOriginChunk(chunks: ChunkSummary[], updatesByChunkKey: Map<string, any>): void {
+function renderOriginChunk(chunks: ChunkSummary[], updatesByChunkKey: Map<string, any>): number {
   const origin = chunks.find(c => c.coordinates.x === '0' && c.coordinates.y === '0' && c.coordinates.z === '0');
   if (!origin || !origin.voxels) {
     // eslint-disable-next-line no-console
     console.warn('Origin chunk not found or has no voxels');
-    return;
+    return 0;
   }
 
   let bytes = decodeChunkVoxelsBase64(origin.voxels);
@@ -140,8 +168,9 @@ function renderOriginChunk(chunks: ChunkSummary[], updatesByChunkKey: Map<string
     if (!voxelRenderer) {
       voxelRenderer = new VoxelRenderer(gameInstance.getScene());
     }
-    voxelRenderer.renderChunkBytes(bytes, { x: 0, y: 0, z: 0 });
+    return voxelRenderer.renderChunkBytes(bytes, { x: 0, y: 0, z: 0 });
   }
+  return 0;
 }
 
 async function onAuthSuccess(tokens: AuthTokens, overlay: HTMLDivElement): Promise<void> {
@@ -195,6 +224,10 @@ window.addEventListener('DOMContentLoaded', () => {
     if (gridRenderer) {
       gridRenderer.dispose();
       gridRenderer = null;
+    }
+    if (labelRenderer) {
+      labelRenderer.dispose();
+      labelRenderer = null;
     }
   });
 });
