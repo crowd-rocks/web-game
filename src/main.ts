@@ -122,6 +122,7 @@ async function loadInitialChunksAndVoxels(token: string): Promise<void> {
       gridRenderer = new ChunkGridRenderer(gameInstance.getScene());
     }
     gridRenderer.renderForChunkKeys(requestedKeys);
+    gridRenderer.setEnabled(false); // toggle off grid lines by default
 
     if (!labelRenderer) {
       labelRenderer = new ChunkLabelRenderer(gameInstance.getScene());
@@ -143,34 +144,32 @@ async function loadInitialChunksAndVoxels(token: string): Promise<void> {
     updatesByChunkKey.set(key, ch);
   }
 
-  // For now, render only the origin chunk; we can expand to all chunks after validating
-  const voxelsRendered = renderOriginChunk(chunks, updatesByChunkKey);
+  // Render voxels for all returned chunks
+  const totalVoxels = await renderAllChunks(chunks, updatesByChunkKey);
 
   // eslint-disable-next-line no-console
-  console.log(`[World Load] requestedChunks=${requestedKeys.length} returnedChunks=${chunks.length} visibleVoxels=${voxelsRendered}`);
+  console.log(`[World Load] requestedChunks=${requestedKeys.length} returnedChunks=${chunks.length} visibleVoxels=${totalVoxels}`);
 }
 
-function renderOriginChunk(chunks: ChunkSummary[], updatesByChunkKey: Map<string, any>): number {
-  const origin = chunks.find(c => c.coordinates.x === '0' && c.coordinates.y === '0' && c.coordinates.z === '0');
-  if (!origin || !origin.voxels) {
-    // eslint-disable-next-line no-console
-    console.warn('Origin chunk not found or has no voxels');
-    return 0;
-  }
+async function renderAllChunks(chunks: ChunkSummary[], updatesByChunkKey: Map<string, any>): Promise<number> {
+  if (!gameInstance) return 0;
+  if (!voxelRenderer) voxelRenderer = new VoxelRenderer(gameInstance.getScene());
 
-  let bytes = decodeChunkVoxelsBase64(origin.voxels);
-  const originUpdate = updatesByChunkKey.get('0:0:0');
-  if (originUpdate) {
-    applyVoxelUpdatesToChunkBytes(bytes, originUpdate.voxels, { x: 0, y: 0, z: 0 });
-  }
-
-  if (gameInstance) {
-    if (!voxelRenderer) {
-      voxelRenderer = new VoxelRenderer(gameInstance.getScene());
+  let total = 0;
+  // Simple approach: render one chunk at a time replacing previous; for a real game we’d keep per-chunk meshes
+  for (const ch of chunks) {
+    if (!ch.voxels) continue;
+    const cx = parseInt(ch.coordinates.x, 10);
+    const cy = parseInt(ch.coordinates.y, 10);
+    const cz = parseInt(ch.coordinates.z, 10);
+    const bytes = decodeChunkVoxelsBase64(ch.voxels);
+    const upd = updatesByChunkKey.get(`${ch.coordinates.x}:${ch.coordinates.y}:${ch.coordinates.z}`);
+    if (upd) {
+      applyVoxelUpdatesToChunkBytes(bytes, upd.voxels, { x: cx, y: cy, z: cz });
     }
-    return voxelRenderer.renderChunkBytes(bytes, { x: 0, y: 0, z: 0 });
+    total += voxelRenderer.renderChunkBytes(bytes, { x: cx, y: cy, z: cz });
   }
-  return 0;
+  return total;
 }
 
 async function onAuthSuccess(tokens: AuthTokens, overlay: HTMLDivElement): Promise<void> {

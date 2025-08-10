@@ -10,6 +10,7 @@ export class ChunkGridRenderer {
   private scene: Scene;
   private grids = new Map<string, LinesMesh>();
   private material: StandardMaterial;
+  private enabled = true;
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -24,6 +25,16 @@ export class ChunkGridRenderer {
     this.material.dispose();
   }
 
+  setEnabled(flag: boolean): void {
+    if (this.enabled === flag) return;
+    this.enabled = flag;
+    for (const mesh of this.grids.values()) {
+      mesh.isVisible = this.enabled;
+    }
+  }
+
+  isEnabled(): boolean { return this.enabled; }
+
   renderForChunks(coords: ChunkCoord[]): void {
     this.renderForChunkKeys(coords.map(c => `${toInt(c.x)}:${toInt(c.y)}:${toInt(c.z)}`));
   }
@@ -34,6 +45,7 @@ export class ChunkGridRenderer {
       if (!this.grids.has(key)) {
         const [cx, cy, cz] = key.split(':').map(v => parseInt(v, 10));
         const mesh = this.createChunkBox(cx, cy, cz);
+        mesh.isVisible = this.enabled;
         this.grids.set(key, mesh);
       }
     }
