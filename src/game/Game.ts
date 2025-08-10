@@ -4,17 +4,16 @@ import {
     Vector3, 
     HemisphericLight, 
     MeshBuilder,
-    FreeCamera,
+    UniversalCamera,
     StandardMaterial,
-    Color3,
-    ArcRotateCamera
+    Color3
 } from '@babylonjs/core';
 
 export class Game {
     private canvas: HTMLCanvasElement;
     private engine: Engine;
     private scene: Scene;
-    private camera!: ArcRotateCamera;
+    private camera!: UniversalCamera;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -26,69 +25,37 @@ export class Game {
     }
 
     private createScene(): void {
-        // Create an arc rotate camera for better control
-        this.camera = new ArcRotateCamera('camera', 0, Math.PI / 3, 10, Vector3.Zero(), this.scene);
+        // First-person camera
+        this.camera = new UniversalCamera('fp-camera', new Vector3(0, 2, -5), this.scene);
+        this.camera.setTarget(Vector3.Zero());
         this.camera.attachControl(this.canvas, true);
-        this.camera.lowerRadiusLimit = 5;
-        this.camera.upperRadiusLimit = 20;
+        this.camera.speed = 0.5;
+        this.camera.angularSensibility = 4000;
+        this.camera.keysUp.push(87);    // W
+        this.camera.keysDown.push(83);  // S
+        this.camera.keysLeft.push(65);  // A
+        this.camera.keysRight.push(68); // D
 
-        // Create lighting
-        const light = new HemisphericLight('light', new Vector3(0, 1, 0), this.scene);
-        light.intensity = 0.7;
-
-        // Create ground
-        const ground = MeshBuilder.CreateGround('ground', { width: 20, height: 20 }, this.scene);
-        const groundMaterial = new StandardMaterial('groundMaterial', this.scene);
-        groundMaterial.diffuseColor = new Color3(0.2, 0.2, 0.2);
-        ground.material = groundMaterial;
-
-        // Create main character cube
-        const player = MeshBuilder.CreateBox('player', { size: 1 }, this.scene);
-        const playerMaterial = new StandardMaterial('playerMaterial', this.scene);
-        playerMaterial.diffuseColor = new Color3(0.4, 0.8, 0.4);
-        player.material = playerMaterial;
-        player.position.y = 0.5;
-
-        // Create NPCs (other cubes)
-        this.createNPCs();
-
-        // Add rotation animation to player
-        this.scene.registerBeforeRender(() => {
-            player.rotate(Vector3.Up(), 0.005);
+        // Pointer lock for mouse look
+        this.canvas.addEventListener('click', () => {
+            if (document.pointerLockElement !== this.canvas) {
+                this.canvas.requestPointerLock();
+            }
         });
+
+        // Lighting
+        const light = new HemisphericLight('light', new Vector3(0, 1, 0), this.scene);
+        light.intensity = 0.8;
+
+        // Simple ground
+        const ground = MeshBuilder.CreateGround('ground', { width: 200, height: 200 }, this.scene);
+        const groundMaterial = new StandardMaterial('groundMaterial', this.scene);
+        groundMaterial.diffuseColor = new Color3(0.25, 0.3, 0.25);
+        ground.material = groundMaterial;
     }
 
-    private createNPCs(): void {
-        const npcCount = 8;
-        
-        for (let i = 0; i < npcCount; i++) {
-            const npc = MeshBuilder.CreateBox(`npc${i}`, { size: 0.8 }, this.scene);
-            const npcMaterial = new StandardMaterial(`npcMaterial${i}`, this.scene);
-            
-            // Random colors for NPCs
-            npcMaterial.diffuseColor = new Color3(
-                Math.random() * 0.8 + 0.2,
-                Math.random() * 0.8 + 0.2,
-                Math.random() * 0.8 + 0.2
-            );
-            
-            npc.material = npcMaterial;
-            
-            // Position NPCs in a circle around the center
-            const angle = (i / npcCount) * 2 * Math.PI;
-            const radius = 3 + Math.random() * 4;
-            npc.position = new Vector3(
-                Math.cos(angle) * radius,
-                0.4,
-                Math.sin(angle) * radius
-            );
-
-            // Add individual rotation to each NPC
-            const rotationSpeed = (Math.random() - 0.5) * 0.02;
-            this.scene.registerBeforeRender(() => {
-                npc.rotate(Vector3.Up(), rotationSpeed);
-            });
-        }
+    public getScene(): Scene {
+        return this.scene;
     }
 
     private startRenderLoop(): void {

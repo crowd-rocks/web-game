@@ -21,6 +21,28 @@
     </style>
   </head>
   <body>
+    <div id="auth-overlay" class="auth-overlay">
+      <div class="auth-card">
+        <h1>Crowded Kingdoms</h1>
+        <div class="tabs">
+          <button id="tab-login" class="tab active">Login</button>
+          <button id="tab-register" class="tab">Register</button>
+        </div>
+        <form id="login-form" class="form visible">
+          <label>Email<input type="email" id="login-email" required autocomplete="email" /></label>
+          <label>Password<input type="password" id="login-password" required autocomplete="current-password" /></label>
+          <button type="submit">Login</button>
+          <div id="login-error" class="error"></div>
+        </form>
+        <form id="register-form" class="form">
+          <label>Email<input type="email" id="register-email" required autocomplete="email" /></label>
+          <label>Username<input type="text" id="register-username" required autocomplete="username" /></label>
+          <label>Password<input type="password" id="register-password" required autocomplete="new-password" /></label>
+          <button type="submit">Create Account</button>
+          <div id="register-error" class="error"></div>
+        </form>
+      </div>
+    </div>
     <canvas id="renderCanvas"></canvas>
     <script type="module" src="/src/main.ts"></script>
   </body>

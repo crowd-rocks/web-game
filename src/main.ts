@@ -1,22 +1,202 @@
 import './style.css';
 import { Game } from './game/Game';
+import { login as apiLogin, register as apiRegister, getChunksByDistance, getUserMapStates, listVoxelUpdatesByDistance, decodeChunkVoxelsBase64, applyVoxelUpdatesToChunkBytes, type AuthTokens, type ChunkSummary } from './api/graphql';
+import { VoxelRenderer } from './game/VoxelRenderer';
+import { ChunkGridRenderer } from './game/ChunkGridRenderer';
 
-// Initialize the game when the page loads
-window.addEventListener('DOMContentLoaded', () => {
-    const canvas = document.getElementById('renderCanvas') as HTMLCanvasElement;
-    if (!canvas) {
-        throw new Error('Canvas element not found');
+let gameInstance: Game | null = null;
+let voxelRenderer: VoxelRenderer | null = null;
+let gridRenderer: ChunkGridRenderer | null = null;
+
+// Initialize the game after authentication
+function bootGame(): Game {
+  const canvas = document.getElementById('renderCanvas') as HTMLCanvasElement;
+  if (!canvas) {
+    throw new Error('Canvas element not found');
+  }
+  const game = new Game(canvas);
+  return game;
+}
+
+function setupAuthUI(): void {
+  const overlay = document.getElementById('auth-overlay') as HTMLDivElement;
+  const tabLogin = document.getElementById('tab-login') as HTMLButtonElement;
+  const tabRegister = document.getElementById('tab-register') as HTMLButtonElement;
+  const loginForm = document.getElementById('login-form') as HTMLFormElement;
+  const registerForm = document.getElementById('register-form') as HTMLFormElement;
+  const loginError = document.getElementById('login-error') as HTMLDivElement;
+  const registerError = document.getElementById('register-error') as HTMLDivElement;
+
+  function showLogin() {
+    tabLogin.classList.add('active');
+    tabRegister.classList.remove('active');
+    loginForm.classList.add('visible');
+    registerForm.classList.remove('visible');
+  }
+
+  function showRegister() {
+    tabRegister.classList.add('active');
+    tabLogin.classList.remove('active');
+    registerForm.classList.add('visible');
+    loginForm.classList.remove('visible');
+  }
+
+  tabLogin.addEventListener('click', showLogin);
+  tabRegister.addEventListener('click', showRegister);
+
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    loginError.textContent = '';
+    const email = (document.getElementById('login-email') as HTMLInputElement).value.trim();
+    const password = (document.getElementById('login-password') as HTMLInputElement).value;
+    (loginForm.querySelector('button[type="submit"]') as HTMLButtonElement).disabled = true;
+    try {
+      const tokens = await apiLogin(email, password);
+      await onAuthSuccess(tokens, overlay);
+    } catch (err) {
+      loginError.textContent = (err as Error).message || 'Login failed';
+    } finally {
+      (loginForm.querySelector('button[type="submit"]') as HTMLButtonElement).disabled = false;
     }
+  });
 
-    const game = new Game(canvas);
+  registerForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    registerError.textContent = '';
+    const email = (document.getElementById('register-email') as HTMLInputElement).value.trim();
+    const username = (document.getElementById('register-username') as HTMLInputElement).value.trim();
+    const password = (document.getElementById('register-password') as HTMLInputElement).value;
+    (registerForm.querySelector('button[type="submit"]') as HTMLButtonElement).disabled = true;
+    try {
+      const tokens = await apiRegister(email, username, password);
+      await onAuthSuccess(tokens, overlay);
+    } catch (err) {
+      registerError.textContent = (err as Error).message || 'Registration failed';
+    } finally {
+      (registerForm.querySelector('button[type="submit"]') as HTMLButtonElement).disabled = false;
+    }
+  });
 
-    // Handle window resize
-    window.addEventListener('resize', () => {
-        game.resize();
-    });
+  // default view
+  showLogin();
+}
 
-    // Handle page unload
-    window.addEventListener('beforeunload', () => {
-        game.dispose();
-    });
+async function pickMapId(token: string): Promise<string> {
+  const states = await getUserMapStates(token);
+  if (states.length === 0) {
+    throw new Error('No available maps for this user');
+  }
+  return states[0].mapId;
+}
+
+async function loadInitialChunksAndVoxels(token: string): Promise<void> {
+  const mapId = await pickMapId(token);
+  const centerCoordinate = { x: 0, y: 0, z: 0 };
+
+  const chunks = await getChunksByDistance({
+    mapId,
+    centerCoordinate,
+    maxDistance: 8,
+  }, token);
+
+  // Draw grid for all fetched chunks
+  if (gameInstance) {
+    if (!gridRenderer) {
+      gridRenderer = new ChunkGridRenderer(gameInstance.getScene());
+    }
+    gridRenderer.renderForChunks(chunks.map(c => c.coordinates));
+  }
+
+  const updates = await listVoxelUpdatesByDistance({
+    mapId,
+    centerCoordinate,
+    maxDistance: 8,
+  }, token);
+
+  // Build a lookup of updates by chunk coordinate
+  const updatesByChunkKey = new Map<string, typeof updates[number]>();
+  for (const ch of updates) {
+    const key = `${ch.coordinates.x}:${ch.coordinates.y}:${ch.coordinates.z}`;
+    updatesByChunkKey.set(key, ch);
+  }
+
+  // For now, render only the origin chunk; we can expand to all chunks after validating
+  renderOriginChunk(chunks, updatesByChunkKey);
+}
+
+function renderOriginChunk(chunks: ChunkSummary[], updatesByChunkKey: Map<string, any>): void {
+  const origin = chunks.find(c => c.coordinates.x === '0' && c.coordinates.y === '0' && c.coordinates.z === '0');
+  if (!origin || !origin.voxels) {
+    // eslint-disable-next-line no-console
+    console.warn('Origin chunk not found or has no voxels');
+    return;
+  }
+
+  let bytes = decodeChunkVoxelsBase64(origin.voxels);
+  const originUpdate = updatesByChunkKey.get('0:0:0');
+  if (originUpdate) {
+    applyVoxelUpdatesToChunkBytes(bytes, originUpdate.voxels, { x: 0, y: 0, z: 0 });
+  }
+
+  if (gameInstance) {
+    if (!voxelRenderer) {
+      voxelRenderer = new VoxelRenderer(gameInstance.getScene());
+    }
+    voxelRenderer.renderChunkBytes(bytes, { x: 0, y: 0, z: 0 });
+  }
+}
+
+async function onAuthSuccess(tokens: AuthTokens, overlay: HTMLDivElement): Promise<void> {
+  // Persist token for session
+  sessionStorage.setItem('ck_access_token', tokens.token);
+  sessionStorage.setItem('ck_game_token_id', tokens.gameTokenId);
+  overlay.style.display = 'none';
+
+  // Start game
+  gameInstance = bootGame();
+
+  // Fetch chunks and voxels around origin within distance 8
+  try {
+    await loadInitialChunksAndVoxels(tokens.token);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to load chunks/voxels:', err);
+  }
+}
+
+// Initialize when page loads
+window.addEventListener('DOMContentLoaded', () => {
+  // If token exists, skip auth overlay
+  const existingToken = sessionStorage.getItem('ck_access_token');
+  const overlay = document.getElementById('auth-overlay') as HTMLDivElement;
+  if (existingToken) {
+    overlay.style.display = 'none';
+    gameInstance = bootGame();
+    loadInitialChunksAndVoxels(existingToken).catch(err => console.error(err));
+  } else {
+    setupAuthUI();
+  }
+
+  // Handle window resize
+  window.addEventListener('resize', () => {
+    if (gameInstance) {
+      gameInstance.resize();
+    }
+  });
+
+  // Handle page unload
+  window.addEventListener('beforeunload', () => {
+    if (gameInstance) {
+      gameInstance.dispose();
+      gameInstance = null;
+    }
+    if (voxelRenderer) {
+      voxelRenderer.dispose();
+      voxelRenderer = null;
+    }
+    if (gridRenderer) {
+      gridRenderer.dispose();
+      gridRenderer = null;
+    }
+  });
 });
