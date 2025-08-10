@@ -3,10 +3,7 @@ import {
     Scene, 
     Vector3, 
     HemisphericLight, 
-    MeshBuilder,
-    UniversalCamera,
-    StandardMaterial,
-    Color3
+    UniversalCamera
 } from '@babylonjs/core';
 
 export class Game {
@@ -51,13 +48,6 @@ export class Game {
         // Lighting
         const light = new HemisphericLight('light', new Vector3(0, 1, 0), this.scene);
         light.intensity = 0.8;
-
-        // Simple ground on world XZ at Y=0
-        const ground = MeshBuilder.CreateGround('ground', { width: 200, height: 200 }, this.scene);
-        const groundMaterial = new StandardMaterial('groundMaterial', this.scene);
-        groundMaterial.diffuseColor = new Color3(0.25, 0.3, 0.25);
-        ground.material = groundMaterial;
-        ground.position = new Vector3(0, 0, 0);
 
         // Vertical movement (Space to ascend, Shift to descend)
         this.attachInputListeners();
