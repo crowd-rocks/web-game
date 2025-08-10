@@ -165,7 +165,7 @@ async function renderAllChunks(chunks: ChunkSummary[], updatesByChunkKey: Map<st
     const bytes = decodeChunkVoxelsBase64(ch.voxels);
     const upd = updatesByChunkKey.get(`${ch.coordinates.x}:${ch.coordinates.y}:${ch.coordinates.z}`);
     if (upd) {
-      applyVoxelUpdatesToChunkBytes(bytes, upd.voxels, { x: cx, y: cy, z: cz });
+      applyVoxelUpdatesToChunkBytes(bytes, upd.voxels);
     }
     total += voxelRenderer.renderChunkBytes(bytes, { x: cx, y: cy, z: cz });
   }

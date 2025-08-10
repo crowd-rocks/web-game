@@ -186,12 +186,13 @@ export function decodeChunkVoxelsBase64(data: string): Uint8Array {
   return bytes; // expected length 4096 (16*16*16)
 }
 
-export function applyVoxelUpdatesToChunkBytes(bytes: Uint8Array, updates: VoxelUpdate[], chunkOrigin: { x: number; y: number; z: number }): void {
-  // chunk grid is 16x16x16; assume order x-fastest, then y, then z -> index = x + y*16 + z*256
+// Apply updates using chunk-local voxel coordinates (0..15) with a fixed orientation
+// regardless of world octant. Indexing order is x + y*16 + z*256.
+export function applyVoxelUpdatesToChunkBytes(bytes: Uint8Array, updates: VoxelUpdate[]): void {
   for (const u of updates) {
-    const lx = u.location.x - chunkOrigin.x * 16;
-    const ly = u.location.y - chunkOrigin.y * 16;
-    const lz = u.location.z - chunkOrigin.z * 16;
+    const lx = u.location.x;
+    const ly = u.location.y;
+    const lz = u.location.z;
     if (lx < 0 || lx >= 16 || ly < 0 || ly >= 16 || lz < 0 || lz >= 16) continue;
     const idx = lx + ly * 16 + lz * 256;
     bytes[idx] = u.voxelType & 0xff;
