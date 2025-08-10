@@ -1,6 +1,6 @@
 import './style.css';
 import { Game } from './game/Game';
-import { login as apiLogin, register as apiRegister, getChunksByDistance, listVoxelUpdatesByDistance, decodeChunkVoxelsBase64, applyVoxelUpdatesToChunkBytes, fetchCdnChunkVoxels, type AuthTokens, type ChunkSummary } from './api/graphql';
+import { login as apiLogin, register as apiRegister, getChunksByDistance, listVoxelUpdatesByDistance, decodeChunkVoxelsBase64, applyVoxelUpdatesToChunkBytes, fetchCdnChunkVoxels, logout as apiLogout, type AuthTokens, type ChunkSummary } from './api/graphql';
 import { VoxelRenderer } from './game/VoxelRenderer';
 import { ChunkGridRenderer } from './game/ChunkGridRenderer';
 import { ChunkLabelRenderer } from './game/ChunkLabelRenderer';
@@ -93,8 +93,8 @@ function computeChunkKeysWithinDistance(center: { x: number; y: number; z: numbe
   for (let x = center.x - distance; x <= center.x + distance; x++) {
     for (let y = center.y - distance; y <= center.y + distance; y++) {
       for (let z = center.z - distance; z <= center.z + distance; z++) {
-        const manhattan = Math.abs(x - center.x) + Math.abs(y - center.y) + Math.abs(z - center.z);
-        if (manhattan <= distance) {
+        const chebyshev = Math.max(Math.abs(x - center.x), Math.abs(y - center.y), Math.abs(z - center.z));
+        if (chebyshev <= distance) {
           keys.push(`${x}:${y}:${z}`);
         }
       }
@@ -111,6 +111,29 @@ function setLoadingHud(progressPercent: number, text?: string) {
   if (progressPercent >= 100) {
     setTimeout(() => { hud.style.display = 'none'; }, 500);
   }
+}
+
+function toggleMenu(show: boolean): void {
+  const menu = document.getElementById('menu-overlay') as HTMLDivElement | null;
+  if (!menu) return;
+  menu.classList.toggle('visible', show);
+}
+
+async function handleLogout(): Promise<void> {
+  const token = sessionStorage.getItem('ck_access_token');
+  try { if (token) await apiLogout(token); } catch {}
+  sessionStorage.removeItem('ck_access_token');
+  sessionStorage.removeItem('ck_game_token_id');
+  toggleMenu(false);
+  const overlay = document.getElementById('auth-overlay') as HTMLDivElement | null;
+  if (overlay) overlay.style.display = 'flex';
+  if (gameInstance) {
+    gameInstance.dispose();
+    gameInstance = null;
+  }
+  if (voxelRenderer) { voxelRenderer.dispose(); voxelRenderer = null; }
+  if (gridRenderer) { gridRenderer.dispose(); gridRenderer = null; }
+  if (labelRenderer) { labelRenderer.dispose(); labelRenderer = null; }
 }
 
 async function loadInitialChunksAndVoxels(token: string): Promise<void> {
@@ -160,12 +183,19 @@ async function loadInitialChunksAndVoxels(token: string): Promise<void> {
   // eslint-disable-next-line no-console
   console.log(`[World Load] requestedChunks=${requestedKeys.length} returnedChunks=${chunks.length} visibleVoxels=${totalVoxels}`);
 
-  // Toggle listeners: G for grid, L for labels
+  // Toggle listeners: G for grid, L for labels, Esc for menu, Logout button
+  const logoutBtn = document.getElementById('btn-logout');
+  if (logoutBtn) logoutBtn.addEventListener('click', () => { handleLogout().catch(() => {}); });
+
   window.addEventListener('keydown', (e) => {
     if (e.code === 'KeyG' && gridRenderer) {
       gridRenderer.setEnabled(!gridRenderer.isEnabled());
     } else if (e.code === 'KeyL' && labelRenderer) {
       labelRenderer.setEnabled(!labelRenderer.isEnabled());
+    } else if (e.code === 'Escape') {
+      const menu = document.getElementById('menu-overlay');
+      const showing = !menu?.classList.contains('visible');
+      toggleMenu(showing);
     }
   });
 }

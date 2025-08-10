@@ -37,6 +37,14 @@ async function graphqlRequest<T>(query: string, variables?: Record<string, unkno
   return json.data;
 }
 
+export async function logout(token: string): Promise<boolean> {
+  const query = `
+    mutation Logout { logout }
+  `;
+  const data = await graphqlRequest<{ logout: boolean }>(query, undefined, token);
+  return data.logout;
+}
+
 // CDN loader for chunk data. Returns voxels Uint8Array or null if not present.
 export async function fetchCdnChunkVoxels(mapId: string, cx: number, cy: number, cz: number): Promise<Uint8Array | null> {
   const url = `${CDN_BASE}/${mapId}/0/${cx}/0/${cy}/0/${cz}/0/d2.bin`;
