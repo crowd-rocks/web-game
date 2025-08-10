@@ -141,6 +141,20 @@ function toggleMenu(show: boolean): void {
   menu.classList.toggle('visible', show);
 }
 
+function toggleMenuWithPointerUnlock(): void {
+  const menu = document.getElementById('menu-overlay') as HTMLDivElement | null;
+  const isVisible = !!menu?.classList.contains('visible');
+  if (isVisible) {
+    toggleMenu(false);
+    return;
+  }
+  const canvas = document.getElementById('renderCanvas') as HTMLCanvasElement | null;
+  if (document.pointerLockElement === canvas) {
+    document.exitPointerLock();
+  }
+  toggleMenu(true);
+}
+
 async function handleLogout(): Promise<void> {
   const token = sessionStorage.getItem('ck_access_token');
   try { if (token) await apiLogout(token); } catch {}
@@ -231,6 +245,9 @@ async function loadInitialChunksAndVoxels(token: string): Promise<void> {
       const menu = document.getElementById('menu-overlay');
       const showing = !menu?.classList.contains('visible');
       toggleMenu(showing);
+    } else if (e.code === 'KeyM') {
+      // Toggle menu; if opening, also exit pointer lock
+      toggleMenuWithPointerUnlock();
     }
   });
 }
