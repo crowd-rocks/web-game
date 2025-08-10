@@ -1,6 +1,6 @@
 import './style.css';
 import { Game } from './game/Game';
-import { login as apiLogin, register as apiRegister, getChunksByDistance, getUserMapStates, listVoxelUpdatesByDistance, decodeChunkVoxelsBase64, applyVoxelUpdatesToChunkBytes, type AuthTokens, type ChunkSummary } from './api/graphql';
+import { login as apiLogin, register as apiRegister, getChunksByDistance, listVoxelUpdatesByDistance, decodeChunkVoxelsBase64, applyVoxelUpdatesToChunkBytes, type AuthTokens, type ChunkSummary } from './api/graphql';
 import { VoxelRenderer } from './game/VoxelRenderer';
 import { ChunkGridRenderer } from './game/ChunkGridRenderer';
 
@@ -81,22 +81,20 @@ function setupAuthUI(): void {
   showLogin();
 }
 
-async function pickMapId(token: string): Promise<string> {
-  const states = await getUserMapStates(token);
-  if (states.length === 0) {
-    throw new Error('No available maps for this user');
-  }
-  return states[0].mapId;
+function pickMapId(): string {
+  // Use fixed mapId 1
+  return '1';
 }
 
 async function loadInitialChunksAndVoxels(token: string): Promise<void> {
-  const mapId = await pickMapId(token);
+  const mapId = pickMapId();
   const centerCoordinate = { x: 0, y: 0, z: 0 };
+  const distance = 8;
 
   const chunks = await getChunksByDistance({
     mapId,
     centerCoordinate,
-    maxDistance: 8,
+    maxDistance: distance,
   }, token);
 
   // Draw grid for all fetched chunks
@@ -110,7 +108,7 @@ async function loadInitialChunksAndVoxels(token: string): Promise<void> {
   const updates = await listVoxelUpdatesByDistance({
     mapId,
     centerCoordinate,
-    maxDistance: 8,
+    maxDistance: distance,
   }, token);
 
   // Build a lookup of updates by chunk coordinate
