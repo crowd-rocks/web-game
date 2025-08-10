@@ -10,6 +10,7 @@ export class ChunkLabelRenderer {
   private scene: Scene;
   private labels = new Map<string, Mesh>();
   private beforeRenderObserver?: () => void;
+  private enabled = true;
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -26,6 +27,16 @@ export class ChunkLabelRenderer {
     };
     this.scene.registerBeforeRender(this.beforeRenderObserver);
   }
+
+  setEnabled(flag: boolean): void {
+    if (this.enabled === flag) return;
+    this.enabled = flag;
+    for (const mesh of this.labels.values()) {
+      mesh.isVisible = this.enabled;
+    }
+  }
+
+  isEnabled(): boolean { return this.enabled; }
 
   dispose(): void {
     if (this.beforeRenderObserver) {
@@ -48,6 +59,7 @@ export class ChunkLabelRenderer {
       desiredKeys.add(key);
       if (!this.labels.has(key)) {
         const mesh = this.createLabelMesh(cx, cy, cz);
+        mesh.isVisible = this.enabled;
         this.labels.set(key, mesh);
       }
     }

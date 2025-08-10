@@ -151,3 +151,15 @@ html, body {
   color: #f87171;
   margin-top: 6px;
 }
+
+.loading-hud {
+  position: fixed;
+  bottom: 12px;
+  left: 12px;
+  background: rgba(0,0,0,0.5);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  z-index: 1200;
+}

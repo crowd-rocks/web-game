@@ -103,6 +103,16 @@ function computeChunkKeysWithinDistance(center: { x: number; y: number; z: numbe
   return keys;
 }
 
+function setLoadingHud(progressPercent: number, text?: string) {
+  const hud = document.getElementById('loading-hud') as HTMLDivElement | null;
+  if (!hud) return;
+  hud.style.display = 'block';
+  hud.textContent = `${text ?? 'Loading'}: ${Math.min(100, Math.max(0, Math.round(progressPercent)))}%`;
+  if (progressPercent >= 100) {
+    setTimeout(() => { hud.style.display = 'none'; }, 500);
+  }
+}
+
 async function loadInitialChunksAndVoxels(token: string): Promise<void> {
   const mapId = pickMapId();
   const centerCoordinate = { x: 0, y: 0, z: 0 };
@@ -149,6 +159,15 @@ async function loadInitialChunksAndVoxels(token: string): Promise<void> {
 
   // eslint-disable-next-line no-console
   console.log(`[World Load] requestedChunks=${requestedKeys.length} returnedChunks=${chunks.length} visibleVoxels=${totalVoxels}`);
+
+  // Toggle listeners: G for grid, L for labels
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'KeyG' && gridRenderer) {
+      gridRenderer.setEnabled(!gridRenderer.isEnabled());
+    } else if (e.code === 'KeyL' && labelRenderer) {
+      labelRenderer.setEnabled(!labelRenderer.isEnabled());
+    }
+  });
 }
 
 async function renderAllChunks(mapId: string, chunks: ChunkSummary[], updatesByChunkKey: Map<string, any>): Promise<number> {
@@ -157,34 +176,39 @@ async function renderAllChunks(mapId: string, chunks: ChunkSummary[], updatesByC
 
   voxelRenderer.clearVoxels();
 
-  let total = 0;
-  for (const ch of chunks) {
+  // Prepare CDN fetches in parallel for chunks missing voxels
+  const fetchTasks = chunks.map(async (ch) => {
     const cx = parseInt(ch.coordinates.x, 10);
     const cy = parseInt(ch.coordinates.y, 10);
     const cz = parseInt(ch.coordinates.z, 10);
 
     let bytes: Uint8Array | null = null;
     if (ch.voxels) {
-      // Newest data wins
       bytes = decodeChunkVoxelsBase64(ch.voxels);
     } else {
-      // Try CDN fallback
-      try {
-        bytes = await fetchCdnChunkVoxels(mapId, cx, cy, cz);
-      } catch {
-        bytes = null;
-      }
+      bytes = await fetchCdnChunkVoxels(mapId, cx, cy, cz);
     }
+    return { ch, cx, cy, cz, bytes } as const;
+  });
 
-    if (!bytes) continue;
+  setLoadingHud(1, 'Fetching chunks');
+  const results = await Promise.all(fetchTasks);
 
-    const upd = updatesByChunkKey.get(`${ch.coordinates.x}:${ch.coordinates.y}:${ch.coordinates.z}`);
+  let processed = 0;
+  const total = results.length;
+
+  for (const r of results) {
+    processed++;
+    setLoadingHud((processed / total) * 100, 'Building voxels');
+    if (!r.bytes) continue;
+    const upd = updatesByChunkKey.get(`${r.ch.coordinates.x}:${r.ch.coordinates.y}:${r.ch.coordinates.z}`);
     if (upd) {
-      applyVoxelUpdatesToChunkBytes(bytes, upd.voxels);
+      applyVoxelUpdatesToChunkBytes(r.bytes, upd.voxels);
     }
-    total = voxelRenderer.addChunkBytes(bytes, { x: cx, y: cy, z: cz });
+    voxelRenderer.addChunkBytes(r.bytes, { x: r.cx, y: r.cy, z: r.cz });
   }
-  return total;
+
+  return voxelRenderer.lastRenderedVoxelCount;
 }
 
 async function onAuthSuccess(tokens: AuthTokens, overlay: HTMLDivElement): Promise<void> {
