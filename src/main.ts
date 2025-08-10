@@ -9,6 +9,7 @@ let gameInstance: Game | null = null;
 let voxelRenderer: VoxelRenderer | null = null;
 let gridRenderer: ChunkGridRenderer | null = null;
 let labelRenderer: ChunkLabelRenderer | null = null;
+let authUIInitialized = false;
 
 // Initialize the game after authentication
 function bootGame(): Game {
@@ -81,6 +82,22 @@ function setupAuthUI(): void {
 
   // default view
   showLogin();
+  authUIInitialized = true;
+}
+
+function showAuthLoginView(): void {
+  const overlay = document.getElementById('auth-overlay') as HTMLDivElement | null;
+  const tabLogin = document.getElementById('tab-login') as HTMLButtonElement | null;
+  const tabRegister = document.getElementById('tab-register') as HTMLButtonElement | null;
+  const loginForm = document.getElementById('login-form') as HTMLFormElement | null;
+  const registerForm = document.getElementById('register-form') as HTMLFormElement | null;
+  if (overlay) overlay.style.display = 'flex';
+  if (tabLogin && tabRegister && loginForm && registerForm) {
+    tabLogin.classList.add('active');
+    tabRegister.classList.remove('active');
+    loginForm.classList.add('visible');
+    registerForm.classList.remove('visible');
+  }
 }
 
 function pickMapId(): string {
@@ -113,6 +130,11 @@ function setLoadingHud(progressPercent: number, text?: string) {
   }
 }
 
+function hideLoadingHud() {
+  const hud = document.getElementById('loading-hud') as HTMLDivElement | null;
+  if (hud) hud.style.display = 'none';
+}
+
 function toggleMenu(show: boolean): void {
   const menu = document.getElementById('menu-overlay') as HTMLDivElement | null;
   if (!menu) return;
@@ -125,8 +147,8 @@ async function handleLogout(): Promise<void> {
   sessionStorage.removeItem('ck_access_token');
   sessionStorage.removeItem('ck_game_token_id');
   toggleMenu(false);
-  const overlay = document.getElementById('auth-overlay') as HTMLDivElement | null;
-  if (overlay) overlay.style.display = 'flex';
+  hideLoadingHud();
+
   if (gameInstance) {
     gameInstance.dispose();
     gameInstance = null;
@@ -134,6 +156,19 @@ async function handleLogout(): Promise<void> {
   if (voxelRenderer) { voxelRenderer.dispose(); voxelRenderer = null; }
   if (gridRenderer) { gridRenderer.dispose(); gridRenderer = null; }
   if (labelRenderer) { labelRenderer.dispose(); labelRenderer = null; }
+
+  // Clear the canvas content explicitly
+  const canvas = document.getElementById('renderCanvas') as HTMLCanvasElement | null;
+  if (canvas) {
+    canvas.width = canvas.width; // resets and clears the canvas bitmap
+  }
+
+  // Ensure auth UI is ready and show login form
+  if (!authUIInitialized) {
+    setupAuthUI();
+  } else {
+    showAuthLoginView();
+  }
 }
 
 async function loadInitialChunksAndVoxels(token: string): Promise<void> {
@@ -261,6 +296,9 @@ async function onAuthSuccess(tokens: AuthTokens, overlay: HTMLDivElement): Promi
 
 // Initialize when page loads
 window.addEventListener('DOMContentLoaded', () => {
+  // Reveal the document once our scripts are ready
+  document.documentElement.style.visibility = 'visible';
+
   // If token exists, skip auth overlay
   const existingToken = sessionStorage.getItem('ck_access_token');
   const overlay = document.getElementById('auth-overlay') as HTMLDivElement;
