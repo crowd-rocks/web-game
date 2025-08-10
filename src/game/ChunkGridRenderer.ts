@@ -59,17 +59,20 @@ export class ChunkGridRenderer {
 
   private createChunkBox(cx: number, cy: number, cz: number): LinesMesh {
     const size = 16;
-    const min = new Vector3(cx * size, cy * size, cz * size);
-    const max = new Vector3(min.x + size, min.y + size, min.z + size);
+    // Server coords (x,y,z) with z up -> world (x,z,y)
+    const minServer = { x: cx * size, y: cy * size, z: cz * size };
+    const maxServer = { x: minServer.x + size, y: minServer.y + size, z: minServer.z + size };
 
-    const p000 = new Vector3(min.x, min.y, min.z);
-    const p001 = new Vector3(min.x, min.y, max.z);
-    const p010 = new Vector3(min.x, max.y, min.z);
-    const p011 = new Vector3(min.x, max.y, max.z);
-    const p100 = new Vector3(max.x, min.y, min.z);
-    const p101 = new Vector3(max.x, min.y, max.z);
-    const p110 = new Vector3(max.x, max.y, min.z);
-    const p111 = new Vector3(max.x, max.y, max.z);
+    const toWorld = (sx: number, sy: number, sz: number) => new Vector3(sx, sz, sy);
+
+    const p000 = toWorld(minServer.x, minServer.y, minServer.z);
+    const p001 = toWorld(minServer.x, minServer.y, maxServer.z);
+    const p010 = toWorld(minServer.x, maxServer.y, minServer.z);
+    const p011 = toWorld(minServer.x, maxServer.y, maxServer.z);
+    const p100 = toWorld(maxServer.x, minServer.y, minServer.z);
+    const p101 = toWorld(maxServer.x, minServer.y, maxServer.z);
+    const p110 = toWorld(maxServer.x, maxServer.y, minServer.z);
+    const p111 = toWorld(maxServer.x, maxServer.y, maxServer.z);
 
     const lines = [
       [p000, p001], [p000, p010], [p000, p100],

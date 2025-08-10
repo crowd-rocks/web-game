@@ -44,8 +44,12 @@ export class VoxelRenderer {
     this.instances = [];
 
     for (const v of voxels) {
+      // Server z is up. Map server (x,y,z) -> world (x,z,y)
+      const wx = v.x + 0.5;
+      const wy = v.z + 0.5;
+      const wz = v.y + 0.5;
       const inst = this.baseCube.createInstance(`vx-${v.x}-${v.y}-${v.z}`);
-      inst.position = new Vector3(v.x + 0.5, v.y + 0.5, v.z + 0.5);
+      inst.position = new Vector3(wx, wy, wz);
       inst.material = this.materialForType(v.type);
       this.instances.push(inst);
     }
@@ -65,11 +69,16 @@ export class VoxelRenderer {
           const idx = x + y * size + z * size * size;
           const type = chunkBytes[idx];
           if (type === 0) continue;
-          const wx = chunkOrigin.x * size + x;
-          const wy = chunkOrigin.y * size + y;
-          const wz = chunkOrigin.z * size + z;
-          const inst = this.baseCube.createInstance(`vx-${wx}-${wy}-${wz}`);
-          inst.position = new Vector3(wx + 0.5, wy + 0.5, wz + 0.5);
+          // Server (x,y,z), with z up. Chunk origin is in server chunk coords.
+          // World mapping: X -> X, Z(up) -> Y, Y -> Z
+          const sx = chunkOrigin.x * size + x;
+          const sy = chunkOrigin.y * size + y;
+          const sz = chunkOrigin.z * size + z;
+          const wx = sx + 0.5;
+          const wy = sz + 0.5;
+          const wz = sy + 0.5;
+          const inst = this.baseCube.createInstance(`vx-${sx}-${sy}-${sz}`);
+          inst.position = new Vector3(wx, wy, wz);
           inst.material = this.materialForType(type);
           this.instances.push(inst);
         }

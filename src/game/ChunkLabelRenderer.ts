@@ -68,9 +68,12 @@ export class ChunkLabelRenderer {
     const plane = MeshBuilder.CreatePlane(`chunk-label-${text}`,
       { width: baseWidth, height: baseHeight }, this.scene);
 
-    // Position at chunk center
+    // Position at chunk center: server (x,y,z, z up) -> world (x,z,y)
     const s = 16;
-    plane.position = new Vector3(cx * s + s / 2, cy * s + s / 2, cz * s + s / 2);
+    const sx = cx * s + s / 2;
+    const sy = cy * s + s / 2;
+    const sz = cz * s + s / 2;
+    plane.position = new Vector3(sx, sz, sy);
 
     // Billboard to face camera
     plane.billboardMode = AbstractMesh.BILLBOARDMODE_ALL;
