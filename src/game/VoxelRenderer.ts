@@ -16,11 +16,16 @@ export class VoxelRenderer {
   }
 
   dispose(): void {
-    this.instances.forEach(i => i.dispose());
-    this.instances = [];
+    this.clearVoxels();
     this.baseCube.dispose();
     this.materialCache.forEach(mat => mat.dispose());
     this.materialCache.clear();
+    this.lastRenderedVoxelCount = 0;
+  }
+
+  clearVoxels(): void {
+    this.instances.forEach(i => i.dispose());
+    this.instances = [];
     this.lastRenderedVoxelCount = 0;
   }
 
@@ -39,10 +44,7 @@ export class VoxelRenderer {
   }
 
   renderVoxels(voxels: SimpleVoxel[]): number {
-    // Clear previous
-    this.instances.forEach(i => i.dispose());
-    this.instances = [];
-
+    this.clearVoxels();
     for (const v of voxels) {
       // Server z is up. Map server (x,y,z) -> world (x,z,y)
       const wx = v.x + 0.5;
@@ -57,11 +59,7 @@ export class VoxelRenderer {
     return this.lastRenderedVoxelCount;
   }
 
-  renderChunkBytes(chunkBytes: Uint8Array, chunkOrigin: { x: number; y: number; z: number }): number {
-    // Clear previous
-    this.instances.forEach(i => i.dispose());
-    this.instances = [];
-
+  addChunkBytes(chunkBytes: Uint8Array, chunkOrigin: { x: number; y: number; z: number }): number {
     const size = 16;
     for (let z = 0; z < size; z++) {
       for (let y = 0; y < size; y++) {
@@ -86,5 +84,10 @@ export class VoxelRenderer {
     }
     this.lastRenderedVoxelCount = this.instances.length;
     return this.lastRenderedVoxelCount;
+  }
+
+  renderChunkBytes(chunkBytes: Uint8Array, chunkOrigin: { x: number; y: number; z: number }): number {
+    this.clearVoxels();
+    return this.addChunkBytes(chunkBytes, chunkOrigin);
   }
 } 

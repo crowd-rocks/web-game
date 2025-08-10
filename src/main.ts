@@ -1,6 +1,6 @@
 import './style.css';
 import { Game } from './game/Game';
-import { login as apiLogin, register as apiRegister, getChunksByDistance, listVoxelUpdatesByDistance, decodeChunkVoxelsBase64, applyVoxelUpdatesToChunkBytes, type AuthTokens, type ChunkSummary } from './api/graphql';
+import { login as apiLogin, register as apiRegister, getChunksByDistance, listVoxelUpdatesByDistance, decodeChunkVoxelsBase64, applyVoxelUpdatesToChunkBytes, fetchCdnChunkVoxels, type AuthTokens, type ChunkSummary } from './api/graphql';
 import { VoxelRenderer } from './game/VoxelRenderer';
 import { ChunkGridRenderer } from './game/ChunkGridRenderer';
 import { ChunkLabelRenderer } from './game/ChunkLabelRenderer';
@@ -144,30 +144,45 @@ async function loadInitialChunksAndVoxels(token: string): Promise<void> {
     updatesByChunkKey.set(key, ch);
   }
 
-  // Render voxels for all returned chunks
-  const totalVoxels = await renderAllChunks(chunks, updatesByChunkKey);
+  // Render voxels for all returned chunks with CDN fallback and updates applied
+  const totalVoxels = await renderAllChunks(mapId, chunks, updatesByChunkKey);
 
   // eslint-disable-next-line no-console
   console.log(`[World Load] requestedChunks=${requestedKeys.length} returnedChunks=${chunks.length} visibleVoxels=${totalVoxels}`);
 }
 
-async function renderAllChunks(chunks: ChunkSummary[], updatesByChunkKey: Map<string, any>): Promise<number> {
+async function renderAllChunks(mapId: string, chunks: ChunkSummary[], updatesByChunkKey: Map<string, any>): Promise<number> {
   if (!gameInstance) return 0;
   if (!voxelRenderer) voxelRenderer = new VoxelRenderer(gameInstance.getScene());
 
+  voxelRenderer.clearVoxels();
+
   let total = 0;
-  // Simple approach: render one chunk at a time replacing previous; for a real game we’d keep per-chunk meshes
   for (const ch of chunks) {
-    if (!ch.voxels) continue;
     const cx = parseInt(ch.coordinates.x, 10);
     const cy = parseInt(ch.coordinates.y, 10);
     const cz = parseInt(ch.coordinates.z, 10);
-    const bytes = decodeChunkVoxelsBase64(ch.voxels);
+
+    let bytes: Uint8Array | null = null;
+    if (ch.voxels) {
+      // Newest data wins
+      bytes = decodeChunkVoxelsBase64(ch.voxels);
+    } else {
+      // Try CDN fallback
+      try {
+        bytes = await fetchCdnChunkVoxels(mapId, cx, cy, cz);
+      } catch {
+        bytes = null;
+      }
+    }
+
+    if (!bytes) continue;
+
     const upd = updatesByChunkKey.get(`${ch.coordinates.x}:${ch.coordinates.y}:${ch.coordinates.z}`);
     if (upd) {
       applyVoxelUpdatesToChunkBytes(bytes, upd.voxels);
     }
-    total += voxelRenderer.renderChunkBytes(bytes, { x: cx, y: cy, z: cz });
+    total = voxelRenderer.addChunkBytes(bytes, { x: cx, y: cy, z: cz });
   }
   return total;
 }

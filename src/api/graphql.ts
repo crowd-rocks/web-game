@@ -5,6 +5,7 @@ export type AuthTokens = {
 
 const PROD_GRAPHQL = 'https://webapi.crowdedkingdoms.com:6443/graphql';
 const GRAPHQL_ENDPOINT = import.meta.env.DEV ? '/graphql' : PROD_GRAPHQL;
+const CDN_BASE = 'http://data.crowdedkingdoms.com/m/0';
 
 export type GraphQLResponse<T> = {
   data?: T;
@@ -34,6 +35,21 @@ async function graphqlRequest<T>(query: string, variables?: Record<string, unkno
     throw new Error('No data in GraphQL response');
   }
   return json.data;
+}
+
+// CDN loader for chunk data. Returns voxels Uint8Array or null if not present.
+export async function fetchCdnChunkVoxels(mapId: string, cx: number, cy: number, cz: number): Promise<Uint8Array | null> {
+  const url = `${CDN_BASE}/${mapId}/0/${cx}/0/${cy}/0/${cz}/0/d2.bin`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const buf = await res.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  if (bytes.length < 4096 + 2 + 2) {
+    // not enough to contain voxels and lengths; still try voxels if present
+  }
+  // First 4096 bytes are voxels
+  const voxels = bytes.slice(0, 4096);
+  return voxels;
 }
 
 // Auth
