@@ -1,15 +1,4 @@
-# Crowded Kingdoms - Babylon.js Game
-
-A 3D web game built with Babylon.js and Vite, featuring a "crowded" scene with multiple animated characters.
-
-## Features
-
-- **3D Scene**: Full 3D environment with ground, lighting, and camera controls
-- **Player Character**: Central green cube representing the player
-- **NPCs**: Multiple colored cubes scattered around the scene, each with unique rotation speeds
-- **Camera Controls**: Arc rotate camera with zoom limits for better user experience
-- **Responsive**: Automatically adjusts to window resizing
-- **Modern Build**: Uses Vite for fast development and building
+# Crowded Kingdoms - Web Client
 
 ## Getting Started
 
