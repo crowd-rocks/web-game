@@ -1,5 +1,7 @@
 # Crowded Kingdoms - Web Client
 
+https://game.crowdedkingdoms.com
+
 ## Getting Started
 
 ### Prerequisites
